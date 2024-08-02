@@ -1,0 +1,14 @@
+*.pyc
+*.png
+*.jpg
+*.pth
+*.pkl
+data
+*.pdf
+experiments_info/*.py
+*.sh
+weights
+*.lmdb
+*.npy
+*.pt
+.ipynb_checkpoints
