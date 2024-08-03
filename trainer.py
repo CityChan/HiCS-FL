@@ -11,6 +11,7 @@ from server.server_divfl import Server_DivFL
 from server.server_cs import Server_CS
 from server.server_hics import Server_HiCS
 from server.server_fedcor import Server_FedCor
+from server.server_oracle import Server_Oracle
 
 
 def train(args):
@@ -44,5 +45,7 @@ def _train(args):
         server = Server_HiCS(args)
     if args["method"] == "fedcor":
         server = Server_FedCor(args)
+    if args["method"] == "oracle":
+        server = Server_Oracle(args)
     server.train()
     

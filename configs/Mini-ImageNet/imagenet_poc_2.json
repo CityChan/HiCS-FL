@@ -1,0 +1,20 @@
+{   
+    "alphas": [0.001, 0.005, 0.01, 0.1, 1],
+    "dataset": "Mini-ImageNet",
+    "method": "poc",
+    "loss": "prox",
+    "n_classes": 100,
+    "batch_size": 32,
+    "n_clients": 100,
+    "local_epochs":1,
+    "epochs": 100,
+    "frac": 0.2,
+    "lr": 0.001,
+    "optim": "adam",
+    "momentum": 0.9,
+    "gamma": 0.1,
+    "weight_decay": 5e-4,
+    "seed": 42,
+    "device": "cuda:6",
+    "exp": "imagenet_poc_2"
+}

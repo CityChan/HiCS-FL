@@ -43,7 +43,21 @@ class Client_base(object):
             batch_loss.append(loss1.item())
             self.optimizer.step()
         return batch_loss
-    
+
+    def _update(self):
+        batch_loss = []
+        ce_loss = nn.CrossEntropyLoss() 
+        for batch_idx, (X, y) in enumerate(self.trainloader):
+            X = X.to(self.device)
+            y = y.to(self.device)
+            self.optimizer.zero_grad()
+            p = self.model(X).double()
+            loss = ce_loss(p,y) 
+            loss.backward()
+            batch_loss.append(loss.item())
+            self.optimizer.step()
+        return batch_loss
+        
 
     def local_training(self):
         self.model.train()
@@ -52,6 +66,8 @@ class Client_base(object):
         for epoch in range(self.args["local_epochs"]):
             if self.args["loss"] == "prox":
                 batch_loss = self._update_prox(prev_model)
+            if self.args["loss"] == "ce":
+                batch_loss = self._update()
  
         return self.model.state_dict(), np.sum(np.array(batch_loss))/len(batch_loss)
 

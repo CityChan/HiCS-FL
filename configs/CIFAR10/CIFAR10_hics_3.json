@@ -1,5 +1,5 @@
 {   
-    "alphas": [0.001, 0.002, 0.005, 0.01, 0.5],
+    "alphas": [0.001, 0.002, 0.005, 0.01, 0.1],
     "dataset": "CIFAR10",
     "method": "hics",
     "loss": "prox",
@@ -19,5 +19,5 @@
     "weight_decay": 5e-4,
     "seed": 42,
     "device": "cuda:0",
-    "exp": "cifar10_hics_2"
+    "exp": "cifar10_hics_3"
 }

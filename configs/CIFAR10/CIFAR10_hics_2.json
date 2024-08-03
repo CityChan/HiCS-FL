@@ -1,0 +1,23 @@
+{   
+    "alphas": [0.001, 0.002, 0.005, 0.01, 0.5],
+    "dataset": "CIFAR10",
+    "method": "hics",
+    "loss": "prox",
+    "n_classes": 10,
+    "batch_size": 64,
+    "n_clients": 50,
+    "lambda": 10,
+    "gamma": 4,
+    "temp": 0.001,
+    "local_epochs":1,
+    "epochs": 500,
+    "frac": 0.2,
+    "lr": 0.001,
+    "optim": "adam",
+    "momentum": 0.9,
+    "gamma": 0.1,
+    "weight_decay": 5e-4,
+    "seed": 42,
+    "device": "cuda:0",
+    "exp": "cifar10_hics_2"
+}

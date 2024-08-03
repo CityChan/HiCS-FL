@@ -18,8 +18,14 @@ from utils import Accuracy,average_weights
 import warnings
 warnings.filterwarnings('ignore')
 import json
+from clustering import get_gradients_fc,get_matrix_similarity_from_grads,get_clusters_with_alg2,get_similarity
+from scipy.cluster.hierarchy import linkage
+import scipy.stats
+from itertools import product
+from sklearn.cluster import AgglomerativeClustering 
+from numpy.random import choice
 
-class Server_PowOfChoice(object):
+class Server_Oracle(object):
     def __init__(self,args):
         self.args = args
         self.seed = args["seed"]
@@ -60,52 +66,62 @@ class Server_PowOfChoice(object):
         for idx in range(args["n_clients"]):
             self.clients.append(Client(args, idx,copy.deepcopy(self.global_model), Loaders_train[idx], Loaders_test[idx]))
 
-        n_samples = np.array([len(client.trainloader.dataset) for client in  self.clients])
-        self.weights = n_samples / np.sum(n_samples)
+        self.n_samples = np.array([len(client.trainloader.dataset) for client in  self.clients])
+        self.weights = self.n_samples / np.sum(self.n_samples)
         self.Global_acc = []
         self.Local_acc = []
         self.Mean_loss = []
-        
+
+        self.Counts = []
+        for idx in range(args["n_clients"]):
+            counts = [0]*args["n_classes"]
+            for batch_idx,(X,y) in enumerate(Loaders_train[idx]):
+                batch = len(y)
+                y = np.array(y)
+                for i in range(batch):
+                    counts[int(y[i])] += 1
+            self.Counts.append(np.array(counts))
+        self.Entropy = self.compute_entropy()
+        self.gradients = get_gradients_fc("clustered_2", self.global_model, [self.global_model] * args["n_clients"])
+
     def train(self):
+        
         global_weights = self.global_model.state_dict()
         n_sampled = max(int(self.args["frac"] * self.args["n_clients"]), 1)
-        for epoch in tqdm(range(self.args["epochs"])):
-            print(f'\n | Global Training Round : {epoch+1} |\n')
-            print("poc sampling")
-            np.random.seed(epoch)
-            if epoch == 0:
-                sampled_clients = np.random.choice(self.args["n_clients"], size=n_sampled, replace=False, p=self.weights)
-            else:
-                power_of_choice = np.random.choice(self.args["n_clients"], size=2*n_sampled, replace=False, p=self.weights)
-                sampled_clients = power_of_choice[np.argsort(np.array(local_loss)[power_of_choice])[-n_sampled:]]
-                
-            print("selection in epoch: ", epoch)
-            print(sampled_clients) 
 
+        for epoch in tqdm(range(self.args["epochs"])):
+            previous_global_model = copy.deepcopy(self.global_model)
+            print(f'\n | Global Training Round : {epoch+1} |\n')
             local_weights = []
             local_loss = []
             local_acc = []
+            clients_models = []
+            sampled_clients_for_grad = []
+            sampled_clients = self.cluster_sampling(self.gradients, "cosine",epoch)
+                
+            print("selection in epoch: ", epoch)
+            print(sampled_clients) 
             
             for idx in sampled_clients:
                 self.clients[idx].load_model(global_weights)
                 w, loss =  self.clients[idx].local_training()
+                clients_models.append(copy.deepcopy(self.clients[idx].model))
+                sampled_clients_for_grad.append(idx)
                 acc = self.clients[idx].local_accuracy()
                 local_acc.append(acc)
+                local_loss.append(loss)
                 local_weights.append(copy.deepcopy(w))
 
-            
             global_weights = average_weights(local_weights)
             self.global_model.load_state_dict(global_weights)
             self.global_acc()
-
-            for idx in range(self.args["n_clients"]):
-                self.clients[idx].load_model(global_weights)
-                loss = self.clients[idx].train_loss()
-                local_loss.append(loss) 
-                                        
             self.Local_acc.append(np.mean(local_acc))
             self.Mean_loss.append(np.mean(local_loss))
-            
+
+            gradients_i = get_gradients_fc("clustered_2", previous_global_model, clients_models)
+            for idx, gradient in zip(sampled_clients_for_grad, gradients_i):
+                self.gradients[idx] = gradient
+                    
         stat = {}    
         stat["Global_acc"] = self.Global_acc
         stat["Local_acc"] = self.Local_acc
@@ -113,6 +129,7 @@ class Server_PowOfChoice(object):
         torch.save(global_weights, self.ckpt_path + self.args["exp"] + ".pt")
         json.dump(stat, open(self.ckpt_path + self.args["exp"] + ".json", "w")) 
 
+        
     def global_acc(self):
         accuracy = 0
         cnt = 0
@@ -126,3 +143,77 @@ class Server_PowOfChoice(object):
             cnt += 1
         print("accuracy of global test:",accuracy/cnt)
         self.Global_acc.append(accuracy/cnt)
+
+    def cluster_sampling(self,gradients, sim_type,epoch):
+        Clusters = []
+        n_sampled = max(int(self.args["frac"] * self.args["n_clients"]), 1)
+        sim_matrix = self.get_matrix_similarity_from_grads_entropy(gradients, self.Entropy, distance_type=sim_type)
+        linkage_matrix = linkage(sim_matrix, "ward") 
+        hc = AgglomerativeClustering(n_clusters = self.args["M"], metric = "euclidean", linkage = 'ward') 
+     
+        hc.fit_predict(sim_matrix)
+        labels = hc.labels_
+        for i in range(self.args["M"]):
+            cluster_i = np.where(labels == i)[0]
+            Clusters.append(cluster_i)    
+        avg_entropy = self.estimated_entropy(Clusters)
+        
+        return self.sample_clients_entropy(avg_entropy, Clusters,self.n_samples,epoch)
+
+
+    def compute_entropy(self):
+        Entropy = []
+        for idx in range(self.args["n_clients"]):
+            count = self.Counts[idx]
+            pk = count/np.sum(count)
+            entropy = scipy.stats.entropy(pk)
+            Entropy.append(entropy)
+        return Entropy
+
+    def estimated_entropy(self, Clusters):
+        Entropys = []
+        for k in range(len(Clusters)):
+            print("cluster ", k)
+            print(Clusters[k])
+            group_entropy = 0
+            cluster = Clusters[k]
+            for idx in cluster:
+                group_entropy += self.Entropy[idx]
+            if len(cluster) > 0:
+                group_entropy = group_entropy/len(cluster)
+            Entropys.append(group_entropy)
+        Entropys = np.array(Entropys)
+        return Entropys
+    
+    def get_matrix_similarity_from_grads_entropy(self, local_model_grads, entropy,distance_type):
+        
+        n_clients = len(local_model_grads)
+        metric_matrix = np.zeros((n_clients, n_clients))
+        for i, j in product(range(n_clients), range(n_clients)):
+            metric = get_similarity(local_model_grads[i], local_model_grads[j], distance_type) 
+            metric_matrix[i, j] =  metric + self.args["lambda"]*abs(entropy[i] - entropy[j])
+        return metric_matrix
+
+    def sample_clients_entropy(self, entropy, Clusters, n_samples,epoch):
+        n_sampled = max(int(self.args["frac"] * self.args["n_clients"]), 1)
+        n_clients = len(n_samples)
+        n_clustered = len(Clusters)
+        entropy = np.exp(self.args["gamma"]*(self.args["epochs"]- epoch)*entropy/self.args["epochs"])
+    
+        p_cluster = entropy/np.sum(entropy)
+        sampled_clients = []
+        clusters_selected = [0]*n_sampled
+        
+        for k in range(n_sampled):
+            select_group = int(choice(n_clustered, 1, p=p_cluster))
+            while clusters_selected[select_group] >= len(Clusters[select_group]):
+                select_group = int(choice(n_clustered, 1, p=p_cluster)) 
+            clusters_selected[select_group] += 1
+        
+        for k in range(len(clusters_selected)):
+            if clusters_selected[k] == 0:
+                continue
+            select_clients = choice(Clusters[k], clusters_selected[k], replace = False)
+            for i in range(clusters_selected[k]):
+                sampled_clients.append(select_clients[i])
+        return sampled_clients

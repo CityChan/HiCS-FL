@@ -32,10 +32,17 @@ class Server_DivFL(object):
             self.global_model = CIFAR10_CNN().to(self.device)
             train_dataset,testset, dict_users, dict_users_test =  partition_data_various_alpha(n_users = args["n_clients"], alphas=  args["alphas"], rand_seed =  args["seed"], dataset='CIFAR10')
 
+            for m in self.global_model.modules():
+                if isinstance(m, (nn.Conv2d, nn.Linear)):
+                    nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
+                
         elif args["dataset"] == "FMNIST":
             self.global_model = FMNIST_CNN().to(self.device)
             train_dataset,testset, dict_users, dict_users_test =  partition_data_various_alpha(n_users = args["n_clients"], alphas=  args["alphas"], rand_seed =  args["seed"], dataset='FMNIST')
-            
+            for m in self.global_model.modules():
+                if isinstance(m, (nn.Conv2d, nn.Linear)):
+                    nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
+                    
         elif args["dataset"] == "Mini-ImageNet":
             self.global_model = resnet18(weights='IMAGENET1K_V1')
             for param in self.global_model.parameters():
@@ -45,10 +52,8 @@ class Server_DivFL(object):
             self.global_model = self.global_model.to(self.device)
             
             train_dataset,testset, dict_users, dict_users_test =  partition_data_various_alpha_imagenet(n_users = args["n_clients"], alphas= args["alphas"], rand_seed = args["seed"])
-        
-        for m in self.global_model.modules():
-            if isinstance(m, (nn.Conv2d, nn.Linear)):
-                nn.init.xavier_uniform_(m.weight, gain=nn.init.calculate_gain('relu'))
+            self.global_model.fc.weight = nn.init.normal_(self.global_model.fc.weight, mean=0.0, std=0.01)    
+            self.global_model.fc.bias = nn.init.zeros_(self.global_model.fc.bias)
                 
         Loaders_train = LocalDataloaders(train_dataset,dict_users,args["batch_size"],ShuffleorNot = True)
         Loaders_test = LocalDataloaders(testset,dict_users_test,args["batch_size"],ShuffleorNot = True)
