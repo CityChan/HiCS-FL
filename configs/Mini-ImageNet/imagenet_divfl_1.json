@@ -1,13 +1,13 @@
 {   
     "alphas": [0.001, 0.01, 0.1, 0.5, 1],
-    "dataset": "CIFAR10",
-    "method": "poc",
+    "dataset": "Mini-ImageNet",
+    "method": "divfl",
     "loss": "prox",
-    "n_classes": 10,
-    "batch_size": 64,
-    "n_clients": 50,
+    "n_classes": 100,
+    "batch_size": 32,
+    "n_clients": 100,
     "local_epochs":1,
-    "epochs": 500,
+    "epochs": 100,
     "frac": 0.2,
     "lr": 0.001,
     "optim": "adam",
@@ -15,6 +15,6 @@
     "gamma": 0.1,
     "weight_decay": 5e-4,
     "seed": 42,
-    "device": "cuda:3",
-    "exp": "cifar10_poc_1"
+    "device": "cuda:5",
+    "exp": "imagenet_divfl_1"
 }

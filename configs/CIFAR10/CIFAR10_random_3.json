@@ -15,6 +15,6 @@
     "gamma": 0.1,
     "weight_decay": 5e-4,
     "seed": 42,
-    "device": "cuda:0",
+    "device": "cuda:4",
     "exp": "cifar10_random_3"
 }

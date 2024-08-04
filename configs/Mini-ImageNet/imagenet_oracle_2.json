@@ -8,7 +8,7 @@
     "n_clients": 100,
     "lambda": 10,
     "gamma": 2,
-    "M": 20,
+    "M": 5,
     "local_epochs":1,
     "epochs": 100,
     "frac": 0.2,

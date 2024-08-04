@@ -19,6 +19,6 @@
     "gamma": 0.1,
     "weight_decay": 5e-4,
     "seed": 42,
-    "device": "cuda:6",
+    "device": "cuda:0",
     "exp": "CIFAR10_hics_2_lambda1_gamma4_M10"
 }

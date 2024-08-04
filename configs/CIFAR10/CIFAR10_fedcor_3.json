@@ -28,5 +28,5 @@
     "weight_decay": 5e-4,
     "seed": 42,
     "device": "cuda:4",
-    "exp": "cifar10_fedcor_3"
+    "exp": "cifar10_fedcor_1"
 }
