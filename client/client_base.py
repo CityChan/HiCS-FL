@@ -66,7 +66,7 @@ class Client_base(object):
         for epoch in range(self.args["local_epochs"]):
             if self.args["loss"] == "prox":
                 batch_loss = self._update_prox(prev_model)
-            if self.args["loss"] == "ce":
+            if self.args["loss"] == "avg":
                 batch_loss = self._update()
  
         return self.model.state_dict(), np.sum(np.array(batch_loss))/len(batch_loss)

@@ -12,17 +12,16 @@ from server.server_cs import Server_CS
 from server.server_hics import Server_HiCS
 from server.server_fedcor import Server_FedCor
 from server.server_oracle import Server_Oracle
-from server.server_oort import Server_Oort
 
 
-def train(args):
+def eval(args):
     seed = copy.deepcopy(args['seed'])
     device = copy.deepcopy(args['device'])
     device = device.split(',')
     print(args)
     args['seed'] = seed
     args['device'] = device
-    _train(args)
+    _eval(args)
 
     myseed = 42  # set a random seed for reproducibility
     torch.backends.cudnn.deterministic = True
@@ -33,7 +32,7 @@ def train(args):
         
         
         
-def _train(args):
+def _eval(args):
     if args["method"] == "random":
         server = Server_base(args)
     if args["method"] == "poc":
@@ -48,7 +47,5 @@ def _train(args):
         server = Server_FedCor(args)
     if args["method"] == "oracle":
         server = Server_Oracle(args)
-    if args["method"] == "oort":
-        server = Server_Oort(args)
-    server.train()
+    server.persoanlized_test()
     

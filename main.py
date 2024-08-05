@@ -2,12 +2,15 @@ import json
 import argparse
 import ipdb
 from trainer import train
+from eval import eval
+
 def main():
     args = setup_parser().parse_args()
     param = load_json(args.config)
     args = vars(args)  
     args.update(param)  
     train(args)
+    # eval(args)
 
 def load_json(settings_path):
     with open(settings_path) as data_file:

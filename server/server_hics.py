@@ -18,8 +18,9 @@ from utils import Accuracy,average_weights
 import warnings
 warnings.filterwarnings('ignore')
 import json
-from clustering import get_gradients_fc,get_matrix_similarity_from_grads,get_clusters_with_alg2,get_similarity
+from clustering import get_gradients_fc,get_matrix_similarity_from_grads,get_clusters_with_alg2,get_similarity,sample_clients
 from scipy.cluster.hierarchy import linkage
+
 import scipy.stats
 from itertools import product
 from sklearn.cluster import AgglomerativeClustering 
@@ -74,7 +75,16 @@ class Server_HiCS(object):
 
         self.gradients = get_gradients_fc("clustered_2", self.global_model, [self.global_model] * args["n_clients"])
         self.magnitudes = self.magnitude_gradient(self.gradients)
-        
+
+        alphas = set()
+        for alpha in self.args["alphas"]:
+            alphas.add(alpha)
+
+        if len(alphas) > 1:
+            self.multialpha = True
+        else:
+            self.multialpha = False
+    
     def train(self):
         
         global_weights = self.global_model.state_dict()
@@ -114,11 +124,16 @@ class Server_HiCS(object):
             self.Local_acc.append(np.mean(local_acc))
             self.Mean_loss.append(np.mean(local_loss))
 
-            if epoch < warmup:
+            if self.multialpha:
+                if epoch < warmup:
+                    gradients_i = get_gradients_fc("clustered_2", previous_global_model, clients_models)
+                    for idx, gradient in zip(sampled_clients_for_grad, gradients_i):
+                        self.gradients[idx] = gradient
+            else:
                 gradients_i = get_gradients_fc("clustered_2", previous_global_model, clients_models)
                 for idx, gradient in zip(sampled_clients_for_grad, gradients_i):
                     self.gradients[idx] = gradient
-        
+                    
             self.magnitudes = self.magnitude_gradient(self.gradients)
         
         stat = {}    
@@ -150,16 +165,21 @@ class Server_HiCS(object):
         estimated_H = self.estimated_entropy_from_grad(magnitudes)
         sim_matrix = self.get_matrix_similarity_from_grads_entropy(gradients, estimated_H, distance_type=sim_type)
         linkage_matrix = linkage(sim_matrix, "ward") 
-        hc = AgglomerativeClustering(n_clusters = self.args["M"], metric = "euclidean", linkage = 'ward') 
-     
-        hc.fit_predict(sim_matrix)
-        labels = hc.labels_
-        for i in range(self.args["M"]):
-            cluster_i = np.where(labels == i)[0]
-            Clusters.append(cluster_i)    
-        avg_entropy = self.estimated_entropy(estimated_H,Clusters)
-        
-        return self.sample_clients_entropy(avg_entropy, Clusters,self.n_samples,epoch)
+
+        if self.multialpha:
+            hc = AgglomerativeClustering(n_clusters = self.args["M"], metric = "euclidean", linkage = 'ward') 
+         
+            hc.fit_predict(sim_matrix)
+            labels = hc.labels_
+            for i in range(self.args["M"]):
+                cluster_i = np.where(labels == i)[0]
+                Clusters.append(cluster_i)    
+            avg_entropy = self.estimated_entropy(estimated_H,Clusters)
+            return self.sample_clients_entropy(avg_entropy, Clusters,self.n_samples,epoch)
+
+        else:
+            distri_clusters = get_clusters_with_alg2(linkage_matrix, n_sampled, self.weights)
+            return sample_clients(distri_clusters)
 
     def magnitude_gradient(self, gradients):
         magnitudes = []
@@ -229,3 +249,16 @@ class Server_HiCS(object):
             for i in range(clusters_selected[k]):
                 sampled_clients.append(select_clients[i])
         return sampled_clients
+
+
+    def persoanlized_test(self):
+        self.global_model.load_state_dict(torch.load(self.ckpt_path + self.args["exp"] + ".pt"))
+        global_weights = self.global_model.state_dict()
+        Acc = 0
+        for idx in range(self.args["n_clients"]):
+            self.clients[idx].load_model(global_weights)
+            w, loss =  self.clients[idx].local_training()
+            acc = self.clients[idx].local_accuracy()
+            Acc += acc
+        print("the average personalized acc:")
+        print(Acc/self.args["n_clients"])

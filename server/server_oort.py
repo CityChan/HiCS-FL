@@ -18,8 +18,10 @@ from utils import Accuracy,average_weights
 import warnings
 warnings.filterwarnings('ignore')
 import json
+from UCBsampler import UCBsampler
+import math
 
-class Server_base(object):
+class Server_Oort(object):
     def __init__(self,args):
         self.args = args
         self.seed = args["seed"]
@@ -62,11 +64,17 @@ class Server_base(object):
         for idx in range(args["n_clients"]):
             self.clients.append(Client(args, idx,copy.deepcopy(self.global_model), Loaders_train[idx], Loaders_test[idx]))
 
-        n_samples = np.array([len(client.trainloader.dataset) for client in  self.clients])
-        self.weights = n_samples / np.sum(n_samples)
+        self.n_samples = np.array([len(client.trainloader.dataset) for client in  self.clients])
+        self.weights = self.n_samples / np.sum(self.n_samples)
         self.Global_acc = []
         self.Local_acc = []
         self.Mean_loss = []
+        self.ucbSampler = UCBsampler(args)
+
+        for idx in range(args["n_clients"]):
+            feedbacks = {'reward': self.n_samples[idx], 'duration':1}
+            self.ucbSampler.register_client(idx, feedbacks=feedbacks)
+            self.ucbSampler.update_duration(idx, 1)
         
     def train(self):
         global_weights = self.global_model.state_dict()
@@ -76,15 +84,30 @@ class Server_base(object):
             local_weights = []
             local_loss = []
             local_acc = []
-            print("random sampling")
             np.random.seed(epoch)
-            sampled_clients = np.random.choice(self.args["n_clients"], size=n_sampled, replace=False, p=self.weights)
+            feasible_clients = range(self.args["n_clients"])
+            if epoch < 25:
+                print("random sampling")
+                sampled_clients = np.random.choice(self.args["n_clients"], size=n_sampled, replace=False, p=self.weights)
+
+            else:
+                print("ucb sampling")
+                sampled_clients = self.ucbSampler.select_participant(n_sampled,feasible_clients)
+                
             print("selection in epoch: ", epoch)
             print(sampled_clients) 
             
             for idx in sampled_clients:
                 self.clients[idx].load_model(global_weights)
                 w, loss =  self.clients[idx].local_training()
+                reward =  math.sqrt(loss)*self.n_samples[idx]
+                feedbacks = {
+                    'reward': reward,
+                    'duration': 1,
+                    'status': True,
+                    'time_stamp': epoch
+                }
+                self.ucbSampler.update_client_util(idx, feedbacks=feedbacks)
                 acc = self.clients[idx].local_accuracy()
                 local_acc.append(acc)
                 local_loss.append(loss)

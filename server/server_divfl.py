@@ -270,3 +270,16 @@ class Server_DivFL(object):
             SUi.add(R_set[i])
             V_set.remove(R_set[i])
         return SUi
+
+
+    def persoanlized_test(self):
+        self.global_model.load_state_dict(torch.load(self.ckpt_path + self.args["exp"] + ".pt"))
+        global_weights = self.global_model.state_dict()
+        Acc = 0
+        for idx in range(self.args["n_clients"]):
+            self.clients[idx].load_model(global_weights)
+            w, loss =  self.clients[idx].local_training()
+            acc = self.clients[idx].local_accuracy()
+            Acc += acc
+        print("the average personalized acc:")
+        print(Acc/self.args["n_clients"])
