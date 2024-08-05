@@ -166,7 +166,7 @@ class Server_HiCS(object):
         sim_matrix = self.get_matrix_similarity_from_grads_entropy(gradients, estimated_H, distance_type=sim_type)
         linkage_matrix = linkage(sim_matrix, "ward") 
 
-        if self.multialpha:
+        if np.array(estimated_H).var() < 0.1: 
             hc = AgglomerativeClustering(n_clusters = self.args["M"], metric = "euclidean", linkage = 'ward') 
          
             hc.fit_predict(sim_matrix)
