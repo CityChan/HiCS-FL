@@ -1,6 +1,6 @@
-# Accelerating Non-IID Federated Learning via Heterogeneity-Guided Client Sampling
+# Heterogeneity-Guided Client Sampling: Towards Fast and Efficient Non-IID Federated Learning
 
-This is the code for the NeurIPS2023 submission
+This is the official implementation for the NeurIPS2024 paper
 
 
 ## Install packages in requrement.txt
