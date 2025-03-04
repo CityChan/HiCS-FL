@@ -35,6 +35,18 @@ We use pytorch 1.9.0 + rocm 4.2 environment with a python version 3.6.13. All re
 
 We gave an example in `train_script.sh`
 
+### Citeation
+Please cite our paper, if you think this is useful:
+```
+@article{chen2025heterogeneity,
+  title={Heterogeneity-guided client sampling: Towards fast and efficient non-IID federated learning},
+  author={Chen, Huancheng and Vikalo, Haris},
+  journal={Advances in Neural Information Processing Systems},
+  volume={37},
+  pages={65525--65561},
+  year={2025}
+}
+```
 
 
 
